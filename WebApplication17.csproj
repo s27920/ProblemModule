@@ -21,7 +21,6 @@
 
     <ItemGroup>
       <Folder Include="Executor\client-src\java\" />
-      <Folder Include="Executor\client-src\node\" />
     </ItemGroup>
 
 </Project>
