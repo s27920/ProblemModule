@@ -1,0 +1,37 @@
+using System.Diagnostics;
+
+namespace WebApplication17.Executor;
+
+public class ExecutorConfig
+{
+    private readonly Language[] _supportedLanguages;
+    public Language[] SupportedLanguages => _supportedLanguages;
+
+
+    public ExecutorConfig()
+    {
+        IExecutorRepository executorRepository = new ExecutorRepository();
+        _supportedLanguages = executorRepository.GetSupportedLangs(); 
+        BuildImages();
+    }
+    
+    
+    private void BuildImages()
+    {
+        var shBuildArgs = string.Join(" ", _supportedLanguages.Select(arg => $"\"{arg.Name}\""));
+        
+        Console.WriteLine("building images...");
+        var buildProcess = new Process()
+        {
+            StartInfo = new ProcessStartInfo()
+            {
+                FileName = "/bin/sh",
+                Arguments = $"\"./scripts/build-images.sh\" {shBuildArgs}",
+            }
+        };
+        buildProcess.Start();
+        buildProcess.WaitForExit();
+        
+        Console.WriteLine("...build complete");
+    }
+}
