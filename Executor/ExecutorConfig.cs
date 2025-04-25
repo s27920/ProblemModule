@@ -2,12 +2,21 @@ using System.Diagnostics;
 
 namespace WebApplication17.Executor;
 
-public class ExecutorConfig
+public interface IExecutorConfig
+{
+    public Language[] GetSupportedLanguages();
+}
+
+public class ExecutorConfig : IExecutorConfig
 {
     private readonly Language[] _supportedLanguages;
-    public Language[] SupportedLanguages => _supportedLanguages;
 
-
+    
+    public Language[] GetSupportedLanguages()
+    {
+        return _supportedLanguages;
+    }
+    
     public ExecutorConfig()
     {
         IExecutorRepository executorRepository = new ExecutorRepositoryMock();
@@ -33,5 +42,10 @@ public class ExecutorConfig
         buildProcess.WaitForExit();
         
         Console.WriteLine("...build complete");
+    }
+
+    public Language[] getSupportedLanguages()
+    {
+        throw new NotImplementedException();
     }
 }

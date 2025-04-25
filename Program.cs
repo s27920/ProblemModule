@@ -7,6 +7,7 @@ builder.Services.AddSwaggerGen();
 builder.Services.AddControllers();
 builder.Services.AddScoped<IExecutorRepository, ExecutorRepositoryMock>();
 builder.Services.AddScoped<IExecutorService, ExecutorService>();
+builder.Services.AddSingleton<IExecutorConfig, ExecutorConfig>();
 
 var app = builder.Build();
 

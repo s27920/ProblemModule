@@ -11,12 +11,12 @@ public interface IExecutorService
 }
 
 
-public class ExecutorService(IExecutorRepository executorRepository) : IExecutorService
+public class ExecutorService(IExecutorRepository executorRepository, IExecutorConfig executorConfig) : IExecutorService
 {
     private const string javaImport = "import com.google.gson.Gson;\n"; //TODO this is temporary, not the gson but the way it's imported
-    
-    private readonly ExecutorConfig _config = new ExecutorConfig(); //TODO use this to check language selection
-    private readonly IExecutorRepository _executorRepository = executorRepository;
+
+    private readonly IExecutorConfig _config; //TODO use this to check language selection
+    private readonly IExecutorRepository _executorRepository;
     public async Task<ExecuteResultDto> FullExecute(ExecuteRequestDto executeRequestDto)
     {
         var fileData = await PrepareFile(executeRequestDto);
