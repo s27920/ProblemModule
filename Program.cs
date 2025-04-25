@@ -5,7 +5,7 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 builder.Services.AddControllers();
-builder.Services.AddScoped<IExecutorRepository, ExecutorRepository>();
+builder.Services.AddScoped<IExecutorRepository, ExecutorRepositoryMock>();
 builder.Services.AddScoped<IExecutorService, ExecutorService>();
 
 var app = builder.Build();

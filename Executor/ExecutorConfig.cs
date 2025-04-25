@@ -10,7 +10,7 @@ public class ExecutorConfig
 
     public ExecutorConfig()
     {
-        IExecutorRepository executorRepository = new ExecutorRepository();
+        IExecutorRepository executorRepository = new ExecutorRepositoryMock();
         _supportedLanguages = executorRepository.GetSupportedLangs(); 
         BuildImages();
     }

@@ -1,4 +1,6 @@
 using System.Diagnostics;
+using Polly;
+using Polly.Timeout;
 
 namespace WebApplication17.Executor;
 
@@ -11,6 +13,8 @@ public interface IExecutorService
 
 public class ExecutorService(IExecutorRepository executorRepository) : IExecutorService
 {
+    private const string javaImport = "import com.google.gson.Gson;\n"; //TODO this is temporary, not the gson but the way it's imported
+    
     private readonly ExecutorConfig _config = new ExecutorConfig(); //TODO use this to check language selection
     private readonly IExecutorRepository _executorRepository = executorRepository;
     public async Task<ExecuteResultDto> FullExecute(ExecuteRequestDto executeRequestDto)
@@ -44,9 +48,32 @@ public class ExecutorService(IExecutorRepository executorRepository) : IExecutor
         };
 
         execProcess.Start();
+        
         await execProcess.StandardInput.WriteAsync(fileContests);
         execProcess.StandardInput.Close();
-        await execProcess.WaitForExitAsync();
+
+        var timeoutPolicy = Policy.TimeoutAsync(TimeSpan.FromSeconds(5), TimeoutStrategy.Pessimistic);
+        try // handles spinlocks
+        {
+            await timeoutPolicy.ExecuteAsync(async token => await execProcess.WaitForExitAsync(token), CancellationToken.None);
+        }
+        catch (TimeoutRejectedException)
+        {
+            var timeoutProcess = new Process()
+            {
+                StartInfo = new ProcessStartInfo()
+                {
+                    FileName = "/bin/sh",
+                    Arguments = $"\"./scripts/timeout-container.sh\" \"{fileData.Lang}-{fileData.Guid.ToString()}\"",
+                    CreateNoWindow = true
+                }
+            };
+            timeoutProcess.Start();
+            await timeoutProcess.WaitForExitAsync();
+            return new ExecuteResultDto("", "executing timed out. Aborting");
+        }
+
+
         File.Delete(fileData.FilePath);
 
         var output = await execProcess.StandardOutput.ReadToEndAsync();
@@ -65,10 +92,10 @@ public class ExecutorService(IExecutorRepository executorRepository) : IExecutor
         }
 
         var fileData = new FileData(Guid.NewGuid(), executeRequest.Lang, funcName);
-        
+
+        await File.WriteAllTextAsync(fileData.FilePath, javaImport);
         await File.WriteAllTextAsync(fileData.FilePath, executeRequest.Code);
         
-        // InsertTestCases(fileData.FilePath, funcName);
         return fileData;
     }
     
@@ -81,25 +108,9 @@ public class ExecutorService(IExecutorRepository executorRepository) : IExecutor
 
     private async Task InsertTestCases(FileData fileData)
     {
-        // TODO fetch test cases, for now hardcoded
-        /*
-         proposed test case format
-         test data<
-         expected output<<
-         test data<
-         expected output<<
-         ...
-         Could also have them all in one line beats me, less space but less readable.
-         Furthermore enumerateTestCases would offset by 1 and 2 respectively instead of 2 and 3
-         */
-        var testCases = "[1,5,2,4,3]<\n" +
-                   "[1,2,3,4,5]<<\n" +
-                   "[94,37,9,52,17]<\n" +
-                   "[9,17,37,52,94]<<\n" ;
-
         await using var fileWriter = new StreamWriter(fileData.FilePath, true);
         
-        foreach (var testCase in EnumerateTestCases(testCases))
+        foreach (var testCase in await _executorRepository.GetTestCasesAsync())
         {
             await fileWriter.WriteLineAsync(PrintComparingStatement(testCase, fileData.FuncName));
         }
@@ -122,22 +133,7 @@ public class ExecutorService(IExecutorRepository executorRepository) : IExecutor
         //TODO change this for java
         return $"\nconsole.log({GetComparingStatement(testCase, funcName)});";
     }
-
-    IEnumerable<TestCase> EnumerateTestCases(string testCases)
-    {
-        for (var i = 0; i < testCases.Length;)
-        {
-            var endOfTest = testCases.IndexOf('<', i);
-            var str1 = testCases.Substring(i, endOfTest - i);
-            i = endOfTest + 2;
-
-            var endOfCorr = testCases.IndexOf("<<", i, StringComparison.Ordinal);
-            var str2 = testCases.Substring(i, endOfCorr - i);
-            i = endOfCorr + 3;
-            yield return new TestCase(str1, str2);
-        }
-    }
-
+    
     private class FileData(Guid guid, string lang, string funcName)
     {
         public Guid Guid => guid;
@@ -148,5 +144,5 @@ public class ExecutorService(IExecutorRepository executorRepository) : IExecutor
         
         public string FilePath => $"client-src/{lang}/{guid.ToString()}.java";
     }
-
+    
 }
