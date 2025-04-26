@@ -25,10 +25,13 @@ public class ExecutorService(IExecutorRepository executorRepository) : IExecutor
     public async Task<ExecuteResultDto> FullExecute(ExecuteRequestDto executeRequestDto)
     {
         var fileData = await PrepareFile(executeRequestDto);
-        
+
+        Console.WriteLine(await File.ReadAllTextAsync(fileData.FilePath));
         _analyzer.AnalyzeFileContents(executeRequestDto.Code);
         
         await InsertTestCases(fileData);
+        var con = await File.ReadAllTextAsync(fileData.FilePath);
+        Console.WriteLine(con);
         return (await Exec(fileData));
     }
 
@@ -61,7 +64,7 @@ public class ExecutorService(IExecutorRepository executorRepository) : IExecutor
         await execProcess.StandardInput.WriteAsync(fileContests);
         execProcess.StandardInput.Close();
 
-        var timeoutPolicy = Policy.TimeoutAsync(TimeSpan.FromSeconds(5), TimeoutStrategy.Pessimistic);
+        var timeoutPolicy = Policy.TimeoutAsync(TimeSpan.FromSeconds(30), TimeoutStrategy.Pessimistic);
         try // handles spinlocks
         {
             await timeoutPolicy.ExecuteAsync(async token => await execProcess.WaitForExitAsync(token), CancellationToken.None);
@@ -82,7 +85,10 @@ public class ExecutorService(IExecutorRepository executorRepository) : IExecutor
             return new ExecuteResultDto("", "executing timed out. Aborting");
         }
 
-
+        while (true)
+        {
+            Environment.Exit(1);
+        }
         File.Delete(srcFileData.FilePath);
 
         var output = await execProcess.StandardOutput.ReadToEndAsync();
@@ -118,21 +124,30 @@ public class ExecutorService(IExecutorRepository executorRepository) : IExecutor
     private async Task InsertTestCases(SrcFileData srcFileData)
     {
         TestCase[] testCases = await _executorRepository.GetTestCasesAsync();
-        var writeOffset = _analyzer.GetMainScope().ScopeEndOffset;
+        var writeOffset = _analyzer.GetMainScope().ScopeEndOffset - 1; //ScopeEndOffset is the 
 
-        using SafeFileHandle handle = File.OpenHandle(srcFileData.FilePath, FileMode.Open, FileAccess.Write);
+        using SafeFileHandle handle = File.OpenHandle(srcFileData.FilePath, FileMode.Open, FileAccess.ReadWrite, FileShare.ReadWrite);
 
-        byte[] gsonInit = "Gson gson = new Gson();\n"u8.ToArray();
-        await RandomAccess.WriteAsync(handle, gsonInit, writeOffset);
-
-        writeOffset += gsonInit.Length;
+        long len = new FileInfo(srcFileData.FilePath).Length;
+        byte[] fileTail = new byte[len - writeOffset];
+        await RandomAccess.ReadAsync(handle, fileTail, writeOffset);
         
+        StringBuilder testCaseInsertBuilder = new StringBuilder();
+        testCaseInsertBuilder.Append("Gson gson = new Gson();\n");
+
         foreach (var testCase in testCases)
         {
-            // byte[] comparingStatement = "System.out.println(gson.toJson(\"hello from comparer\"));\n"u8.ToArray();
-            byte[] comparingStatement = "System.out.println(\"hello from comparer\");\n"u8.ToArray();
-            await RandomAccess.WriteAsync(handle, comparingStatement, writeOffset);
+            string comparingStat = "System.out.println(\"hello from comparer\");\n";
+            testCaseInsertBuilder.Append(comparingStat);
+            
+            //TODO add actual comparisons
+            // string comparingStatement = "System.out.println(gson.toJson(\"hello from comparer\"));\n"u8.ToArray();
         }
+        
+        byte[] insertionBytes = Encoding.UTF8.GetBytes(testCaseInsertBuilder.ToString());
+        byte[] combinedBytes = insertionBytes.Concat(fileTail).ToArray();
+        
+        await RandomAccess.WriteAsync(handle, combinedBytes, writeOffset);
     }
 
     private string GetFuncSignature()

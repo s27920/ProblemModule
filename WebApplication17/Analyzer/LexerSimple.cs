@@ -47,7 +47,7 @@ public class LexerSimple : ILexer
                     {
                         _buf.Append(consumedChar);
                         _tokens.Add(ConsumeKeyword(_buf));
-                    }
+                    }else if (Char.IsWhiteSpace(consumedChar)) { }
                     break;
             }
         }
@@ -113,7 +113,7 @@ public class LexerSimple : ILexer
     private char? PeekChar(int offset = 0)
     {
         int accessIndex = offset + _currPos;
-        if (accessIndex < _fileChars.Length - 1)
+        if (accessIndex < _fileChars.Length)
         {
             return _fileChars[accessIndex];
         }

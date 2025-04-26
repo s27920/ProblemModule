@@ -11,8 +11,7 @@ public class ExecutorApiController(IExecutorService executorService) : Controlle
     {
         return Ok(await executorService.FullExecute(executeRequest));
     }
-    [HttpPost]
-    [Route("/dry")]
+    [HttpPost("dry")]
     public async Task<IActionResult> DryExecuteCode([FromBody] ExecuteRequestDto executeRequest)
     {
         return Ok(await executorService.DryExecute(executeRequest));

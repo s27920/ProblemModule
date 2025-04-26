@@ -41,7 +41,10 @@ RUN wget https://dot.net/v1/dotnet-install.sh -O dotnet-install.sh -O dotnet-ins
 WORKDIR /app
 COPY --from=publish /app/publish .
 COPY entrypoint.sh .
-COPY ./Executor .
+COPY ./Executor/client-src ./client-src
+COPY ./Executor/exec-scripts ./exec-scripts
+COPY ./Executor/executor-images ./executor-images
+COPY ./Executor/scripts ./scripts
 
 EXPOSE 80
 

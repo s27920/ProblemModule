@@ -77,6 +77,7 @@ public class ParserSimple : IParser
             scope.ScopedStatements.Add(scopedStatement.Value);
         }
 
+        
         var consumedToken = ConsumeToken();
         
         scope.ScopeEndOffset = consumedToken.FilePos; //consume '}' token
@@ -117,13 +118,17 @@ public class ParserSimple : IParser
 
     private Token ConsumeToken()
     {
+        if (_currPos >= _tokens.Count)
+        {
+            throw new InvalidOperationException("No more tokens");
+        }
         return _tokens[_currPos++];
     }
     
-    private Token? PeekToken(int offset = 0) //Could possibly template this out but might be more trouble that it's worth
+    private Token? PeekToken(int offset = 0)
     {
         int accessIndex = _currPos + offset;
-        if (accessIndex < _tokens.Count - 1)
+        if (accessIndex < _tokens.Count) 
         {
             return _tokens[accessIndex];
         }
