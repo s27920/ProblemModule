@@ -1,6 +1,9 @@
 using System.Diagnostics;
+using System.Text;
+using Microsoft.Win32.SafeHandles;
 using Polly;
 using Polly.Timeout;
+using WebApplication17.Analyzer;
 
 namespace WebApplication17.Executor;
 
@@ -16,10 +19,15 @@ public class ExecutorService(IExecutorRepository executorRepository) : IExecutor
     private const string javaImport = "import com.google.gson.Gson;\n"; //TODO this is temporary, not the gson but the way it's imported
     
     private readonly ExecutorConfig _config = new ExecutorConfig(); //TODO use this to check language selection
+    private readonly IAnalyzer _analyzer = new AnalyzerSimple();
+    
     private readonly IExecutorRepository _executorRepository = executorRepository;
     public async Task<ExecuteResultDto> FullExecute(ExecuteRequestDto executeRequestDto)
     {
         var fileData = await PrepareFile(executeRequestDto);
+        
+        _analyzer.AnalyzeFileContents(executeRequestDto.Code);
+        
         await InsertTestCases(fileData);
         return (await Exec(fileData));
     }
@@ -32,8 +40,9 @@ public class ExecutorService(IExecutorRepository executorRepository) : IExecutor
 
     private async Task<ExecuteResultDto> Exec(SrcFileData srcFileData)
     {
+        
         var fileContests = await File.ReadAllTextAsync(srcFileData.FilePath);
-
+        Console.WriteLine(fileContests);
         var execProcess = new Process()
         {
             StartInfo = new ProcessStartInfo()
@@ -108,14 +117,21 @@ public class ExecutorService(IExecutorRepository executorRepository) : IExecutor
 
     private async Task InsertTestCases(SrcFileData srcFileData)
     {
-        await using var fileWriter = new StreamWriter(srcFileData.FilePath, true);
-
         TestCase[] testCases = await _executorRepository.GetTestCasesAsync();
-        //TODO even though for now we're going for a primitive solution parsing scopes is a must
+        var writeOffset = _analyzer.GetMainScope().ScopeEndOffset;
+
+        using SafeFileHandle handle = File.OpenHandle(srcFileData.FilePath, FileMode.Open, FileAccess.Write);
+
+        byte[] gsonInit = "Gson gson = new Gson();\n"u8.ToArray();
+        await RandomAccess.WriteAsync(handle, gsonInit, writeOffset);
+
+        writeOffset += gsonInit.Length;
         
-        foreach (var testCase in  testCases)
+        foreach (var testCase in testCases)
         {
-            await fileWriter.WriteLineAsync(PrintComparingStatement(testCase, srcFileData.FuncName));
+            // byte[] comparingStatement = "System.out.println(gson.toJson(\"hello from comparer\"));\n"u8.ToArray();
+            byte[] comparingStatement = "System.out.println(\"hello from comparer\");\n"u8.ToArray();
+            await RandomAccess.WriteAsync(handle, comparingStatement, writeOffset);
         }
     }
 
@@ -129,12 +145,6 @@ public class ExecutorService(IExecutorRepository executorRepository) : IExecutor
     private string GetComparingStatement(TestCase testCase, string funcName)
     {
         return $"JSON.stringify({testCase.ExpectedOutput}) === JSON.stringify({funcName}({testCase.TestInput}))";
-    }
-
-    private string PrintComparingStatement(TestCase testCase, string funcName)
-    {
-        //TODO change this for java
-        return $"\nconsole.log({GetComparingStatement(testCase, funcName)});";
     }
     
 }

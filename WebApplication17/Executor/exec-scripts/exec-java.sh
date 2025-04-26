@@ -1,8 +1,8 @@
-#! /bin/sh
+#!/bin/sh
 
 filename=$1
 
 mkdir "build"
-javac -d build "$filename.java"
+javac -cp "./gson-2.13.1.jar" -d build "$filename.java"
 cd build || exit 
-java "$filename"
+java -cp "../gson-2.13.1.jar:." "$filename"

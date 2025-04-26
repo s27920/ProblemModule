@@ -28,7 +28,6 @@ public class ExecutorConfig : IExecutorConfig
     {
         var shBuildArgs = string.Join(" ", _supportedLanguages.Select(arg => $"\"{arg.Name}\""));
         
-        Console.WriteLine("building images...");
         var buildProcess = new Process()
         {
             StartInfo = new ProcessStartInfo()
@@ -39,8 +38,6 @@ public class ExecutorConfig : IExecutorConfig
         };
         buildProcess.Start();
         buildProcess.WaitForExit();
-        
-        Console.WriteLine("...build complete");
     }
 
     
