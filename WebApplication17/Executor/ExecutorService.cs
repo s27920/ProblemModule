@@ -156,10 +156,4 @@ public class ExecutorService(IExecutorRepository executorRepository) : IExecutor
         string funcName = "func";
         return funcName;
     }
-
-    private string GetComparingStatement(TestCase testCase, string funcName)
-    {
-        return $"JSON.stringify({testCase.ExpectedOutput}) === JSON.stringify({funcName}({testCase.TestInput}))";
-    }
-    
 }
