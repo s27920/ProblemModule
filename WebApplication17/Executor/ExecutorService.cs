@@ -30,16 +30,16 @@ public class ExecutorService(IExecutorRepository executorRepository) : IExecutor
         return await Exec(fileData);
     }
 
-    private async Task<ExecuteResultDto> Exec(FileData fileData)
+    private async Task<ExecuteResultDto> Exec(SrcFileData srcFileData)
     {
-        var fileContests = await File.ReadAllTextAsync(fileData.FilePath);
+        var fileContests = await File.ReadAllTextAsync(srcFileData.FilePath);
 
         var execProcess = new Process()
         {
             StartInfo = new ProcessStartInfo()
             {
                 FileName = "/bin/sh",
-                Arguments = $"\"./scripts/deploy-executor-container.sh\" \"{fileData.Lang}\" \"{fileData.Guid.ToString()}\"",
+                Arguments = $"\"./scripts/deploy-executor-container.sh\" \"{srcFileData.Lang}\" \"{srcFileData.Guid.ToString()}\"",
                 RedirectStandardError = true,
                 RedirectStandardOutput = true,
                 RedirectStandardInput = true,
@@ -64,7 +64,7 @@ public class ExecutorService(IExecutorRepository executorRepository) : IExecutor
                 StartInfo = new ProcessStartInfo()
                 {
                     FileName = "/bin/sh",
-                    Arguments = $"\"./scripts/timeout-container.sh\" \"{fileData.Lang}-{fileData.Guid.ToString()}\"",
+                    Arguments = $"\"./scripts/timeout-container.sh\" \"{srcFileData.Lang}-{srcFileData.Guid.ToString()}\"",
                     CreateNoWindow = true
                 }
             };
@@ -74,7 +74,7 @@ public class ExecutorService(IExecutorRepository executorRepository) : IExecutor
         }
 
 
-        File.Delete(fileData.FilePath);
+        File.Delete(srcFileData.FilePath);
 
         var output = await execProcess.StandardOutput.ReadToEndAsync();
         var error = await execProcess.StandardError.ReadToEndAsync();
@@ -82,7 +82,7 @@ public class ExecutorService(IExecutorRepository executorRepository) : IExecutor
         return new ExecuteResultDto(output, error);
     }
 
-    private async Task<FileData> PrepareFile(ExecuteRequestDto executeRequest)
+    private async Task<SrcFileData> PrepareFile(ExecuteRequestDto executeRequest)
     {
         string funcName = GetFuncSignature();
         
@@ -91,7 +91,7 @@ public class ExecutorService(IExecutorRepository executorRepository) : IExecutor
             throw new FunctionSignatureException(null);
         }
 
-        var fileData = new FileData(Guid.NewGuid(), executeRequest.Lang, funcName);
+        var fileData = new SrcFileData(Guid.NewGuid(), executeRequest.Lang, funcName);
 
         await File.WriteAllTextAsync(fileData.FilePath, javaImport);
         await File.WriteAllTextAsync(fileData.FilePath, executeRequest.Code);
@@ -106,13 +106,16 @@ public class ExecutorService(IExecutorRepository executorRepository) : IExecutor
         //TODO for now let's all pass, gonna use AST later on.
     }
 
-    private async Task InsertTestCases(FileData fileData)
+    private async Task InsertTestCases(SrcFileData srcFileData)
     {
-        await using var fileWriter = new StreamWriter(fileData.FilePath, true);
+        await using var fileWriter = new StreamWriter(srcFileData.FilePath, true);
+
+        TestCase[] testCases = await _executorRepository.GetTestCasesAsync();
+        //TODO even though for now we're going for a primitive solution parsing scopes is a must
         
-        foreach (var testCase in await _executorRepository.GetTestCasesAsync())
+        foreach (var testCase in  testCases)
         {
-            await fileWriter.WriteLineAsync(PrintComparingStatement(testCase, fileData.FuncName));
+            await fileWriter.WriteLineAsync(PrintComparingStatement(testCase, srcFileData.FuncName));
         }
     }
 
@@ -132,17 +135,6 @@ public class ExecutorService(IExecutorRepository executorRepository) : IExecutor
     {
         //TODO change this for java
         return $"\nconsole.log({GetComparingStatement(testCase, funcName)});";
-    }
-    
-    private class FileData(Guid guid, string lang, string funcName)
-    {
-        public Guid Guid => guid;
-
-        public string Lang => lang;
-
-        public string FuncName => funcName;
-        
-        public string FilePath => $"client-src/{lang}/{guid.ToString()}.java";
     }
     
 }
