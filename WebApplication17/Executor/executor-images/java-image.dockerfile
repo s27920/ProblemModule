@@ -3,14 +3,15 @@ FROM openjdk:17-jdk-alpine
 WORKDIR /app
 
 # TODO why is this a "_" instead of "-"
-COPY ./exec-scripts/exec-java.sh ./exec-java.sh 
-COPY ./scripts/stdin-receiver.sh ./stdin-receiver.sh
-RUN chmod +x ./exec-java.sh && \
-    chmod +x ./stdin-receiver.sh && \
-    apk update && \
-    apk upgrade && \
-    apk add curl && \
-    curl -o gson-2.13.1.jar https://repo1.maven.org/maven2/com/google/code/gson/gson/2.13.1/gson-2.13.1.jar && \
+
+COPY ./exec-scripts/exec-java.sh execute_java.sh 
+COPY ./scripts/stdin-receiver.sh stdin-receiver.sh
+RUN chmod +x execute_java.sh && \
+    chmod +x stdin-receiver.sh && \
+    apk update &&\
+    apk upgrade &&\
+    apk add curl &&\
+    curl -o "./gson-2.13.1.jar" https://repo1.maven.org/maven2/com/google/code/gson/gson/2.13.1/gson-2.13.1.jar && \
     echo "installed gson"
 #gson installed for serializing function returns to gson giving us nice, deterministic, consistent formats to work with
 
