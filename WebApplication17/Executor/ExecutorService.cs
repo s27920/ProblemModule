@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Text;
+using ConsoleApp12.Analyzer.AstAnalyzer;
 using Microsoft.Win32.SafeHandles;
 using Polly;
 using Polly.Timeout;
@@ -124,7 +125,7 @@ public class ExecutorService(IExecutorRepository executorRepository) : IExecutor
     private async Task InsertTestCases(SrcFileData srcFileData)
     {
         TestCase[] testCases = await _executorRepository.GetTestCasesAsync();
-        var writeOffset = _analyzer.GetMainScope().ScopeEndOffset - 1; //ScopeEndOffset is the 
+        var writeOffset = 42; /*TODO make this work asap*/ /*_analyzer.GetMainScope().ScopeEndOffset - 1*/; //ScopeEndOffset is the 
 
         using SafeFileHandle handle = File.OpenHandle(srcFileData.FilePath, FileMode.Open, FileAccess.ReadWrite, FileShare.ReadWrite);
 
