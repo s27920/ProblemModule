@@ -1,7 +1,7 @@
 using System.Text;
 using WebApplication17.Analyzer._AnalyzerUtils;
 
-namespace ConsoleApp12.Analyzer.AstBuilder;
+namespace WebApplication17.Analyzer.AstBuilder;
 
 public interface ILexer
 {
@@ -46,13 +46,13 @@ public class LexerSimple : ILexer
                     _tokens.Add(CreateToken(TokenType.OpenBrace));
                     break;
                 case ']':
-                    _tokens.Add(CreateToken(TokenType.CloseCurly));
+                    _tokens.Add(CreateToken(TokenType.CloseBrace));
                     break;
                 case '(':
-                    _tokens.Add(CreateToken(TokenType.OpenCurly));
+                    _tokens.Add(CreateToken(TokenType.OpenParen));
                     break;
                 case ')':
-                    _tokens.Add(CreateToken(TokenType.CloseCurly));
+                    _tokens.Add(CreateToken(TokenType.CloseParen));
                     break;
                 case '=':
                     _tokens.Add(CreateToken(TokenType.Assign));
@@ -69,13 +69,17 @@ public class LexerSimple : ILexer
                     break;
             }
         }
-        
+
+        foreach (var tok in _tokens)
+        {
+            Console.WriteLine(tok.Type);
+        }
         return _tokens;
     }
     
     private Token ConsumeKeyword(StringBuilder buf)
     {
-        buf.Append(ConsumeChar());
+        // buf.Append(ConsumeChar());
         while (PeekChar() != null && Char.IsLetterOrDigit(PeekChar().Value)) //no it can't be a null but thank you Rider
         {
             buf.Append(ConsumeChar());
@@ -159,21 +163,10 @@ public class LexerSimple : ILexer
     
     private Token CreateToken(TokenType type, string? value = null)
     {
-        return new Token(type, _currPos, value);
+        return new Token(type, _currPos - 1, value);
     }
     private char ConsumeChar()
     {
         return _fileChars[_currPos++];
-    }
-    private char? TryConsumeChar(int offset = 0)
-    {
-        char? peekedChar = PeekChar(offset);
-        if (peekedChar != null)
-        {
-            _currPos++;
-            return peekedChar;
-        }
-
-        return null;
     }
 }

@@ -1,8 +1,7 @@
-using ConsoleApp12.Analyzer._AnalyzerUtils;
 using OneOf;
 using WebApplication17.Analyzer._AnalyzerUtils;
 
-namespace ConsoleApp12.Analyzer.AstBuilder;
+namespace WebApplication17.Analyzer.AstBuilder;
 
 public interface IParser
 {
@@ -22,7 +21,6 @@ public class ParserSimple : IParser
         while (PeekToken() is not null)
         {
             program.ProgramClasses.Add(ParseClass());   
-            
         }
 
         return program;
@@ -43,16 +41,20 @@ public class ParserSimple : IParser
         nodeClass.Identifier = ConsumeIfOfType(TokenType.Ident, "class name"); //again no, but thanks rider
         nodeClass.ClassScope = ParseClassScope();
 
+
         return nodeClass;
+        
     }
 
     private AstNodeCLassScope? ParseClassScope()
     {
+
         AstNodeCLassScope classScope = new()
         {
             ScopeBeginOffset = ConsumeIfOfType(TokenType.OpenCurly, "'{'").FilePos
         };
 
+        
         while (!CheckTokenType(TokenType.CloseCurly))
         {
             classScope.ClassMembers.Add(ParseClassMember());
@@ -64,6 +66,7 @@ public class ParserSimple : IParser
 
     private AstNodeClassMember ParseClassMember()
     {
+
         int forwardOffset = 0;
         while (!CheckTokenType(TokenType.Ident, forwardOffset))
         {
@@ -75,8 +78,9 @@ public class ParserSimple : IParser
         {
             classMember.ClassMember = ParseMemberVariableDeclaration();
         }
-        else if (CheckTokenType(TokenType.OpenParen)) //function declaration
+        else if (CheckTokenType(TokenType.OpenParen, forwardOffset+1)) //function declaration
         {
+
             classMember.ClassMember = ParseMemberFunctionDeclaration();
         }
 
@@ -90,24 +94,35 @@ public class ParserSimple : IParser
         if (accessModifier is not null)
         {
             memberFunc.AccessModifier = accessModifier.Value;
+            ConsumeToken();
         }
 
         memberFunc.Modifiers = ParseModifiers();
 
+        OneOf<MemberType,SpecialMemberType>? type = TokenIsType(PeekToken());
+
+        if (type == null)
+        {
+            throw new JavaSyntaxException("return type required");
+        }
+
+        ConsumeToken();
+        memberFunc.FuncReturnType = type.Value;
+
         memberFunc.Identifier = ConsumeIfOfType(TokenType.Ident, "identifier");
-        
+
         ConsumeIfOfType(TokenType.OpenParen, "'('");
         List<AstNodeScopeMemberVar> funcArguments = new();
         while (!CheckTokenType(TokenType.CloseParen))
         {
             funcArguments.Add(ParseScopeMemberVariableDeclaration([MemberModifier.Final]));
         }
+
         memberFunc.FuncArgs = funcArguments;
-        
+
         ConsumeIfOfType(TokenType.CloseParen, "')'");
 
         memberFunc.FuncScope = ParseStatementScope();
-
         return memberFunc;
     }
 
@@ -139,7 +154,7 @@ public class ParserSimple : IParser
             }
         }
 
-        OneOf<MemberType, SpecialMemberType>? memberType = TokenIsType(PeekToken());
+        MemberType? memberType = TokenIsSimpleType(PeekToken());
         ConsumeToken();
         if (memberType is null)
         {
@@ -164,10 +179,9 @@ public class ParserSimple : IParser
 
     private AstNodeStatement ParseDefaultStat()
     {
-        ConsumeToken();
         return new AstNodeStatement()
         {
-            Variant = new AstNodeStatementUnknown()
+            Variant = new AstNodeStatementUnknown(ConsumeToken())
         };
     }
     
@@ -201,7 +215,7 @@ public class ParserSimple : IParser
         AstNodeStatement? scopedStatement;
         while (PeekToken() != null && (scopedStatement = ParseStatement()) != null)
         {
-            scope.ScopedStatements.Add(scopedStatement.Value);
+            scope.ScopedStatements.Add(scopedStatement);
         }
         
         scope.ScopeEndOffset = ConsumeIfOfType(TokenType.CloseCurly, "'}'").FilePos; //consume '}' token
@@ -215,6 +229,7 @@ public class ParserSimple : IParser
         {
             throw new InvalidOperationException("No more tokens");
         }
+
         return _tokens[_currPos++];
     }
     
@@ -256,12 +271,17 @@ public class ParserSimple : IParser
         {
             return result;
         }
-        return token.Type switch
+        switch (token.Type)
         {
-            TokenType.Private => AccessModifier.Private,
-            TokenType.Protected => AccessModifier.Protected,
-            TokenType.Public => AccessModifier.Public,
-        };
+            case TokenType.Private:
+                return AccessModifier.Private;
+            case TokenType.Protected:
+                return AccessModifier.Protected;
+            case TokenType.Public:
+                return AccessModifier.Public;
+            default:
+                return null;
+        }
     }
 
 
@@ -277,6 +297,7 @@ public class ParserSimple : IParser
         {
             TokenType.Final => MemberModifier.Final,
             TokenType.Static => MemberModifier.Static,
+            _ => null,
         };
 
     }
@@ -286,24 +307,27 @@ public class ParserSimple : IParser
         {
             return null;
         }
-
+        
         MemberType? memberType = TokenIsSimpleType(token);
-
+        
         if (memberType is null && token.Type == TokenType.Void)
         {
             return SpecialMemberType.Void;
         }
-
-        return null;
+        
+        return memberType;
     }
 
     private MemberType? TokenIsSimpleType(Token? token)
     {
+
         MemberType? result = null;
         if (token is null)
         {
             return result;
         }
+        
+
         return token.Type switch
         {
             TokenType.Byte => MemberType.Byte,
@@ -314,6 +338,7 @@ public class ParserSimple : IParser
             TokenType.Double => MemberType.Double,
             TokenType.Char => MemberType.Char,
             TokenType.Boolean => MemberType.Boolean,
+            _ => null
         };
     }
 }

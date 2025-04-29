@@ -1,10 +1,10 @@
 using System.Diagnostics;
 using System.Text;
-using ConsoleApp12.Analyzer.AstAnalyzer;
 using Microsoft.Win32.SafeHandles;
 using Polly;
 using Polly.Timeout;
 using WebApplication17.Analyzer;
+using WebApplication17.Analyzer.AstAnalyzer;
 
 namespace WebApplication17.Executor;
 
@@ -28,7 +28,7 @@ public class ExecutorService(IExecutorRepository executorRepository) : IExecutor
         var fileData = await PrepareFile(executeRequestDto);
 
         Console.WriteLine(await File.ReadAllTextAsync(fileData.FilePath));
-        _analyzer.AnalyzeFileContents(executeRequestDto.Code);
+        // _analyzer.AnalyzeFileContents(executeRequestDto.Code);
         
         await InsertTestCases(fileData);
         var con = await File.ReadAllTextAsync(fileData.FilePath);

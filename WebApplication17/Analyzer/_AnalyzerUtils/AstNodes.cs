@@ -2,7 +2,8 @@ using OneOf;
 
 namespace WebApplication17.Analyzer._AnalyzerUtils;
 
-public enum MemberType{
+public enum MemberType
+{
     Byte, Short, Int, Long, Float, Double, Char, Boolean,
 }
 
@@ -11,122 +12,130 @@ public enum SpecialMemberType
     Void, String /*questionable*/
 }
 
-public enum UnaryType{
+public enum UnaryType
+{
     ArrDereference, Incr, Decr
 }
 
-public enum BinaryOperator{
+public enum BinaryOperator
+{
     Sum, Diff, Mul, Div, Mod, And, Or, Xor
 }
 
-public enum LogicalOperator{
+public enum LogicalOperator
+{
     And, Or, Xor
 }
 
-public enum AccessModifier{
+public enum AccessModifier
+{
     Public, Private, Protected
 }
 
-public enum MemberModifier{ //perhaps should consider different legal modifiers for different Token types
+public enum MemberModifier
+{
     Static, Final
 }
 
-public struct AstNodeProgram
+public class AstNodeProgram
 {
-    public List<AstNodeClass> ProgramClasses { get; set; }
+    public List<AstNodeClass> ProgramClasses { get; set; } = new List<AstNodeClass>();
 }
 
-public struct AstNodeClass()
+public class AstNodeClass
 {
-    public AccessModifier ClassAccessModifier {get; set;} = AccessModifier.Private;
-    public AstNodeCLassScope? ClassScope {get; set;}
+    public AccessModifier ClassAccessModifier { get; set; } = AccessModifier.Private;
     public Token Identifier { get; set; }
+    public AstNodeCLassScope? ClassScope { get; set; }
 }
 
-public struct AstNodeCLassScope()
+public class AstNodeCLassScope
 {
-    public List<AstNodeClassMember> ClassMembers { get; set; } = new List<AstNodeClassMember>();
-    public int ScopeBeginOffset { get; set; }
-    public int ScopeEndOffset { get; set; }
-    
-}
-
-public struct AstNodeClassMember
-{
-    public OneOf<AstNodeClassMemberFunc, AstNodeClassMemberVar>  ClassMember {get; set;}
-}
-
-public struct AstNodeClassMemberFunc()
-{
-    public AccessModifier AccessModifier {get; set;} = AccessModifier.Public;
-    public List<MemberModifier> Modifiers { get; set; } = new();
-    public MemberType? FuncReturnType {get; set;}
-    public Token? Identifier {get; set;}
-    public List<AstNodeScopeMemberVar> FuncArgs { get; set; } = new();
-    public AstNodeStatementScope? FuncScope {get; set;}
-    
+    public List<AstNodeClassMember> ClassMembers { get; } = new List<AstNodeClassMember>();
     public int ScopeBeginOffset { get; set; }
     public int ScopeEndOffset { get; set; }
 }
 
-public struct AstNodeClassMemberVar()
+public class AstNodeClassMember
 {
-    public AccessModifier AccessModifier {get; set;} = AccessModifier.Public;
-    public AstNodeScopeMemberVar ScopeMemberVar { get; set; } = new();
+    public OneOf<AstNodeClassMemberFunc, AstNodeClassMemberVar> ClassMember { get; set; }
 }
 
-public struct AstNodeScopeMemberVar()
+public class AstNodeClassMemberFunc
 {
-    public List<MemberModifier>? VarModifiers {get; set;}
-    public OneOf<MemberType, SpecialMemberType> Type { get; set; }
-    public Token? Identifier {get; set;}
+    public AccessModifier AccessModifier { get; set; } = AccessModifier.Public;
+    public List<MemberModifier> Modifiers { get; set; } = new List<MemberModifier>();
+    public OneOf<MemberType,SpecialMemberType>? FuncReturnType { get; set; }
+    public Token? Identifier { get; set; }
+    public List<AstNodeScopeMemberVar> FuncArgs { get; set; } = new List<AstNodeScopeMemberVar>();
+    public AstNodeStatementScope? FuncScope { get; set; }
+    public int ScopeBeginOffset { get; set; }
+    public int ScopeEndOffset { get; set; }
+}
+
+public class AstNodeClassMemberVar
+{
+    public AccessModifier AccessModifier { get; set; } = AccessModifier.Public;
+    public AstNodeScopeMemberVar ScopeMemberVar { get; set; } = new AstNodeScopeMemberVar();
+}
+
+public class AstNodeScopeMemberVar
+{
+    public List<MemberModifier>? VarModifiers { get; set; }
+    public MemberType Type { get; set; }
+    public Token? Identifier { get; set; }
     public Token? LitValue { get; set; }
 }
 
-public struct AstNodeStatementScope()
+public class AstNodeStatementScope
 {
     public int ScopeBeginOffset { get; set; }
     public int ScopeEndOffset { get; set; }
-    public List<AstNodeStatement> ScopedStatements { get; set; } = [];
-    public bool IsMainMethodScope { get; set; } 
+    public List<AstNodeStatement> ScopedStatements { get; set; } = new List<AstNodeStatement>();
 }
 
-public struct AstNodeExpr()
+public class AstNodeExpr
 {
-    public OneOf<AstNodeBinExpr, AstNodeUnaryExpr, AstNodeExprIdent>? Variant {get; set;}
+    public OneOf<AstNodeBinExpr, AstNodeUnaryExpr, AstNodeExprIdent>? Variant { get; set; }
 }
 
-public struct AstNodeUnaryExpr()
+public class AstNodeUnaryExpr
 {
-    AstNodeExpr? Operand {get; set;}
+    public AstNodeExpr? Operand { get; set; }
 }
 
-public struct AstNodeBinExpr(){
-    AstNodeExpr? ExprLhs {get; set;}
-    AstNodeExpr? ExprRhs {get; set;}
-}
-
-public struct AstNodeLit()
+public class AstNodeBinExpr
 {
-    TokenType LitToken {get; set;}
+    public AstNodeExpr? ExprLhs { get; set; }
+    public AstNodeExpr? ExprRhs { get; set; }
 }
 
-public struct AstNodeExprIdent()
+public class AstNodeLit
 {
-    Token? Ident {get; set;}
+    public TokenType LitToken { get; set; }
 }
 
-
-public struct AstNodeStatExpr
+public class AstNodeExprIdent
 {
-    AstNodeExpr? Expr {get; set;}
+    public Token? Ident { get; set; }
 }
 
-public struct AstNodeStatement()
+public class AstNodeStatExpr
 {
-    public OneOf<AstNodeStatementScope /* questionable but allows for easier if parsing more specfically in if (x) statement; */, AstNodeStatementUnknown> Variant {get; set;}
+    public AstNodeExpr? Expr { get; set; }
 }
-public struct AstNodeStatementUnknown(Token ident) //temporary solution to make parsing scopes work for unknown tokens TODO change this
+
+public class AstNodeStatement
 {
-    public Token Ident = ident;
+    public OneOf<AstNodeStatementScope, AstNodeStatementUnknown> Variant { get; set; }
+}
+
+public class AstNodeStatementUnknown
+{
+    public Token Ident { get; }
+
+    public AstNodeStatementUnknown(Token ident)
+    {
+        Ident = ident;
+    }
 }
