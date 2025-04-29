@@ -70,10 +70,10 @@ public class LexerSimple : ILexer
             }
         }
 
-        foreach (var tok in _tokens)
-        {
-            Console.WriteLine(tok.Type);
-        }
+        // foreach (var tok in _tokens)
+        // {
+        //     Console.WriteLine(tok.Type);
+        // }
         return _tokens;
     }
     
@@ -103,6 +103,7 @@ public class LexerSimple : ILexer
             "static" => CreateToken(TokenType.Static),
             "final" => CreateToken(TokenType.Final),
             "class" => CreateToken(TokenType.Class),
+            "String" => CreateToken(TokenType.String),
             _ => CreateToken(TokenType.Ident, result),
         };
         buf.Clear();

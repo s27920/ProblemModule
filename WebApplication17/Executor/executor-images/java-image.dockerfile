@@ -4,9 +4,12 @@ WORKDIR /app
 
 # TODO why is this a "_" instead of "-"
 
-COPY ./exec-scripts/exec-java.sh execute_java.sh 
+ENV SRC_FILENAME=code
+ENV FILE_EXTENSION=java
+
+COPY ./exec-scripts/exec-java.sh execute-java.sh 
 COPY ./scripts/stdin-receiver.sh stdin-receiver.sh
-RUN chmod +x execute_java.sh && \
+RUN chmod +x execute-java.sh && \
     chmod +x stdin-receiver.sh && \
     apk update &&\
     apk upgrade &&\
@@ -15,9 +18,6 @@ RUN chmod +x execute_java.sh && \
     echo "installed gson"
 #gson installed for serializing function returns to gson giving us nice, deterministic, consistent formats to work with
 
-ENV SRC_FILENAME=code
-ENV FILE_EXTENSION=java
-
 #TODO probs make this a custom entrypoint
-ENTRYPOINT ["/bin/sh", "-c", "./stdin-receiver.sh ${FILE_EXTENSION} ${SRC_FILENAME} && ./exec-java.sh ${SRC_FILENAME}"] 
+ENTRYPOINT ["/bin/sh", "-c", "./stdin-receiver.sh ${FILE_EXTENSION} ${SRC_FILENAME} && ./execute-java.sh  ${SRC_FILENAME}"] 
 #code in here is the src filename 

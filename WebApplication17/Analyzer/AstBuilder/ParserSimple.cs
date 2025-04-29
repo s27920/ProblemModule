@@ -99,7 +99,8 @@ public class ParserSimple : IParser
 
         memberFunc.Modifiers = ParseModifiers();
 
-        OneOf<MemberType,SpecialMemberType>? type = TokenIsType(PeekToken());
+
+        OneOf<MemberType,SpecialMemberType, ArrayType>? type = TokenIsType(PeekToken());
 
         if (type == null)
         {
@@ -113,6 +114,7 @@ public class ParserSimple : IParser
 
         ConsumeIfOfType(TokenType.OpenParen, "'('");
         List<AstNodeScopeMemberVar> funcArguments = new();
+
         while (!CheckTokenType(TokenType.CloseParen))
         {
             funcArguments.Add(ParseScopeMemberVariableDeclaration([MemberModifier.Final]));
@@ -131,6 +133,7 @@ public class ParserSimple : IParser
         List<MemberModifier> modifiers = new();
         while (TokenIsType(PeekToken()) == null)
         {
+
             MemberModifier? modifier;
             if ((modifier = TokenIsModifier(PeekToken())) != null)
             {
@@ -146,6 +149,7 @@ public class ParserSimple : IParser
     {
         AstNodeScopeMemberVar scopedVar = new();
         List<MemberModifier> modifiers = ParseModifiers();
+
         foreach (MemberModifier modifier in modifiers)
         {
             if (!permittedModifiers.Contains(modifier))
@@ -156,13 +160,36 @@ public class ParserSimple : IParser
 
         MemberType? memberType = TokenIsSimpleType(PeekToken());
         ConsumeToken();
+        
         if (memberType is null)
         {
             throw new JavaSyntaxException("type expected");
         }
-
+        
+        int dim = 0;
+        if (CheckTokenType(TokenType.OpenBrace) && CheckTokenType(TokenType.CloseBrace, 1)) //TODO abstract this
+        {
+            ConsumeToken();
+            ConsumeToken();
+            dim++;
+            while (CheckTokenType(TokenType.OpenBrace) && CheckTokenType(TokenType.CloseBrace, 1))
+            {
+                dim++;
+                ConsumeToken();
+                ConsumeToken();
+            }
+            scopedVar.Type = new ArrayType()
+            {
+                BaseType = memberType.Value,
+                Dim = dim
+            };
+        }
+        else
+        {
+            scopedVar.Type = memberType.Value;
+        }
+        
         scopedVar.VarModifiers = modifiers;
-        scopedVar.Type = memberType.Value;
         scopedVar.Identifier = ConsumeIfOfType(TokenType.Ident, "ident");
         //TODO important add literal value parsing to allow for actual declarations, left blank for now
         return scopedVar;
@@ -301,7 +328,7 @@ public class ParserSimple : IParser
         };
 
     }
-    private OneOf<MemberType, SpecialMemberType>? TokenIsType(Token? token) //TODO name is not really descriptive, not to me at least, change it
+    private OneOf<MemberType, SpecialMemberType, ArrayType>? TokenIsType(Token? token) //TODO name is not really descriptive, not to me at least, change it
     {
         if (token == null)
         {
@@ -309,11 +336,19 @@ public class ParserSimple : IParser
         }
         
         MemberType? memberType = TokenIsSimpleType(token);
+
         
-        if (memberType is null && token.Type == TokenType.Void)
+        if (memberType is null)
         {
-            return SpecialMemberType.Void;
+            if (token.Type == TokenType.Void)
+            {
+                return SpecialMemberType.Void;
+            }
+
+            return null;
         }
+        
+       
         
         return memberType;
     }
@@ -338,6 +373,7 @@ public class ParserSimple : IParser
             TokenType.Double => MemberType.Double,
             TokenType.Char => MemberType.Char,
             TokenType.Boolean => MemberType.Boolean,
+            TokenType.String => MemberType.String,
             _ => null
         };
     }

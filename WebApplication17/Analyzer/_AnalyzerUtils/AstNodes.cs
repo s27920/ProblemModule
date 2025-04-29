@@ -4,12 +4,12 @@ namespace WebApplication17.Analyzer._AnalyzerUtils;
 
 public enum MemberType
 {
-    Byte, Short, Int, Long, Float, Double, Char, Boolean,
+    Byte, Short, Int, Long, Float, Double, Char, Boolean, String /*Formally incorrect but it allows us to get away with certain simpler solutions for now*/,
 }
 
 public enum SpecialMemberType
 {
-    Void, String /*questionable*/
+    Void 
 }
 
 public enum UnaryType
@@ -35,6 +35,12 @@ public enum AccessModifier
 public enum MemberModifier
 {
     Static, Final
+}
+
+public class ArrayType
+{
+    public OneOf<MemberType> BaseType { get; set; }
+    public int Dim { get; set; }
 }
 
 public class AstNodeProgram
@@ -65,12 +71,10 @@ public class AstNodeClassMemberFunc
 {
     public AccessModifier AccessModifier { get; set; } = AccessModifier.Public;
     public List<MemberModifier> Modifiers { get; set; } = new List<MemberModifier>();
-    public OneOf<MemberType,SpecialMemberType>? FuncReturnType { get; set; }
+    public OneOf<MemberType,SpecialMemberType, ArrayType>? FuncReturnType { get; set; }
     public Token? Identifier { get; set; }
     public List<AstNodeScopeMemberVar> FuncArgs { get; set; } = new List<AstNodeScopeMemberVar>();
     public AstNodeStatementScope? FuncScope { get; set; }
-    public int ScopeBeginOffset { get; set; }
-    public int ScopeEndOffset { get; set; }
 }
 
 public class AstNodeClassMemberVar
@@ -82,7 +86,7 @@ public class AstNodeClassMemberVar
 public class AstNodeScopeMemberVar
 {
     public List<MemberModifier>? VarModifiers { get; set; }
-    public MemberType Type { get; set; }
+    public OneOf<MemberType, ArrayType> Type { get; set; }
     public Token? Identifier { get; set; }
     public Token? LitValue { get; set; }
 }

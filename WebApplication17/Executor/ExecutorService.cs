@@ -27,32 +27,30 @@ public class ExecutorService(IExecutorRepository executorRepository) : IExecutor
     {
         var fileData = await PrepareFile(executeRequestDto);
 
-        Console.WriteLine(await File.ReadAllTextAsync(fileData.FilePath));
-        // _analyzer.AnalyzeFileContents(executeRequestDto.Code);
+        _analyzer.BuildAstFromFileContents(executeRequestDto.Code);
+        var offset = _analyzer.FindMainFunction().FuncScope.ScopeEndOffset;
+
+        await InsertTestCases(fileData, offset);
         
-        await InsertTestCases(fileData);
-        var con = await File.ReadAllTextAsync(fileData.FilePath);
-        Console.WriteLine(con);
         return (await Exec(fileData));
     }
 
     public async Task<ExecuteResultDto> DryExecute(ExecuteRequestDto executeRequestDto)
     {
         var fileData = await PrepareFile(executeRequestDto);
+        _analyzer.BuildAstFromFileContents(executeRequestDto.Code);
         return await Exec(fileData);
     }
 
     private async Task<ExecuteResultDto> Exec(SrcFileData srcFileData)
     {
         
-        var fileContests = await File.ReadAllTextAsync(srcFileData.FilePath);
-        Console.WriteLine(fileContests);
         var execProcess = new Process()
         {
             StartInfo = new ProcessStartInfo()
             {
                 FileName = "/bin/sh",
-                Arguments = $"\"./scripts/deploy-executor-container.sh\" \"{srcFileData.Lang}\" \"{srcFileData.Guid.ToString()}\"",
+                Arguments = $"\"./scripts/deploy-executor-container.sh\" \"{srcFileData.Lang}\" \"{srcFileData.Guid.ToString()}\" \"{_analyzer.GetClassName()}\"",
                 RedirectStandardError = true,
                 RedirectStandardOutput = true,
                 RedirectStandardInput = true,
@@ -62,7 +60,7 @@ public class ExecutorService(IExecutorRepository executorRepository) : IExecutor
 
         execProcess.Start();
         
-        await execProcess.StandardInput.WriteAsync(fileContests);
+        await execProcess.StandardInput.WriteAsync(await File.ReadAllTextAsync(srcFileData.FilePath));
         execProcess.StandardInput.Close();
 
         var timeoutPolicy = Policy.TimeoutAsync(TimeSpan.FromSeconds(30), TimeoutStrategy.Pessimistic);
@@ -85,11 +83,7 @@ public class ExecutorService(IExecutorRepository executorRepository) : IExecutor
             await timeoutProcess.WaitForExitAsync();
             return new ExecuteResultDto("", "executing timed out. Aborting");
         }
-
-        while (true)
-        {
-            Environment.Exit(1);
-        }
+        
         File.Delete(srcFileData.FilePath);
 
         var output = await execProcess.StandardOutput.ReadToEndAsync();
@@ -122,10 +116,9 @@ public class ExecutorService(IExecutorRepository executorRepository) : IExecutor
         //TODO for now let's all pass, gonna use AST later on.
     }
 
-    private async Task InsertTestCases(SrcFileData srcFileData)
+    private async Task InsertTestCases(SrcFileData srcFileData, int writeOffset)
     {
         TestCase[] testCases = await _executorRepository.GetTestCasesAsync();
-        var writeOffset = 42; /*TODO make this work asap*/ /*_analyzer.GetMainScope().ScopeEndOffset - 1*/; //ScopeEndOffset is the 
 
         using SafeFileHandle handle = File.OpenHandle(srcFileData.FilePath, FileMode.Open, FileAccess.ReadWrite, FileShare.ReadWrite);
 

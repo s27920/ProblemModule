@@ -1,7 +1,7 @@
 
 namespace WebApplication17.Analyzer._AnalyzerUtils;
 
-public class Token(TokenType type, int filePos, string? value = null)
+public class Token(TokenType type, int filePos , string? value = null)
 {
     public TokenType Type => type;
 
