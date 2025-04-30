@@ -3,9 +3,8 @@ namespace WebApplication17.Executor;
 public interface IExecutorRepository
 {
     public Task<Language[]> GetSupportedLangsAsync();
-    public Language[] GetSupportedLangs();
     public Task<TestCase[]> GetTestCasesAsync();
-    public Task<TestCase> GetTemplateAsync();
+    public Task<string> GetTemplateAsync();
 }
 
 public class ExecutorRepository : IExecutorRepository
@@ -15,17 +14,12 @@ public class ExecutorRepository : IExecutorRepository
         throw new NotImplementedException();
     }
 
-    public Language[] GetSupportedLangs()
-    {
-        throw new NotImplementedException();
-    }
-
     public async Task<TestCase[]> GetTestCasesAsync()
     {
         throw new NotImplementedException();
     }
 
-    public async Task<TestCase> GetTemplateAsync()
+    public async Task<string> GetTemplateAsync()
     {
         throw new NotImplementedException();
     }
@@ -35,14 +29,7 @@ public class ExecutorRepositoryMock : IExecutorRepository
 {
     public async Task<Language[]> GetSupportedLangsAsync()
     {
-        throw new NotImplementedException();
-    }
-
-    public Language[] GetSupportedLangs()
-    {
-        //TODO hardcoded for now
-        Language[] languages = [new Language("java", null)];
-        return languages;
+        return [new Language("java", null)];
     }
 
     public async Task<TestCase[]> GetTestCasesAsync()
@@ -54,13 +41,11 @@ public class ExecutorRepositoryMock : IExecutorRepository
         return ParseTestCases(testCases);
     }
 
-    public async Task<TestCase> GetTemplateAsync()
+    public async Task<string> GetTemplateAsync()
     {
-        //not useful for now either way, since no ast gen
-        throw new NotImplementedException();
+        return "public class Main {\n    public static int[] sortIntArr(int[] toBeSorted){\n        return null;\n    }\n}";
     }
-    
-    // TODO fetch test cases, for now hardcoded
+
     /*
      proposed test case format
      test data<
@@ -92,7 +77,7 @@ public class ExecutorRepositoryMock : IExecutorRepository
         return testCaseList.ToArray();
     }
     
-    //TODO cool funky version below boring practical version above
+    //TODO cool funky version below boring practical version above (marked todo because it pops out more lol)
     IEnumerable<TestCase> EnumerateTestCases(string testCases)
     {
         for (var i = 0; i < testCases.Length;)
@@ -107,6 +92,4 @@ public class ExecutorRepositoryMock : IExecutorRepository
             yield return new TestCase(str1, str2);
         }
     }
-    
-    
 }

@@ -5,38 +5,64 @@ namespace WebApplication17.Analyzer.AstAnalyzer;
 
 public interface IAnalyzer
 {
-    public void BuildAstFromFileContents(string fileContents);
-    public void BuildAstFromFilePath(string filePath);
-    public AstNodeClassMemberFunc? FindMainFunction();
-    public string GetClassName();
+    public CodeAnalysisResult AnalyzeUserCode();
+    
 }
 
 public class AnalyzerSimple : IAnalyzer
 {
-    private readonly ILexer _lexerSimple = new LexerSimple();
-    private readonly IParser _parserSimple = new ParserSimple();
-    private AstNodeProgram? _programRoot = null;
-
-    public void BuildAstFromFileContents(string fileContents)
+    private readonly ILexer _lexerSimple;
+    private readonly IParser _parserSimple;
+    private readonly AstNodeProgram _userProgramRoot;
+    private readonly AstNodeProgram? _templateProgramRoot;
+    
+    private AstNodeClassMemberFunc _baselineMainSignature = new()
     {
-        List<Token> tokens = _lexerSimple.Tokenize(fileContents);
-        _programRoot = _parserSimple.ParseProgram(tokens);
-    }
+        AccessModifier = AccessModifier.Public,
+        Modifiers = [MemberModifier.Static],
+        FuncReturnType = SpecialMemberType.Void,
+        Identifier = new Token(TokenType.Ident, 0, "main"),
+        FuncArgs =
+        [
+            new AstNodeScopeMemberVar()
+            {
+                Type = new ArrayType { BaseType = MemberType.String, Dim = 1 },
+                Identifier = new Token(TokenType.Ident, 0, "args")
+            }
+        ],
+    };
 
-    public void BuildAstFromFilePath(string filePath)
+    public AnalyzerSimple(string fileContents)
     {
-        List<Token> tokens = _lexerSimple.Tokenize(File.ReadAllText(filePath));
-        _programRoot = _parserSimple.ParseProgram(tokens);
+        _lexerSimple = new LexerSimple();
+        _parserSimple = new ParserSimple();
+        
+        _userProgramRoot = _parserSimple.ParseProgram(_lexerSimple.Tokenize(fileContents));
     }
     
-    public AstNodeClassMemberFunc? FindMainFunction()
+    public AnalyzerSimple(string fileContents, string templateContents)
     {
-        if (_programRoot == null)
-        {
-            throw new NullReferenceException("program must be parsed first");
-        }
+        _lexerSimple = new LexerSimple();
+        _parserSimple = new ParserSimple();
+
+        _userProgramRoot = _parserSimple.ParseProgram(_lexerSimple.Tokenize(fileContents));
+        _templateProgramRoot = _parserSimple.ParseProgram(_lexerSimple.Tokenize(templateContents));
+    }
+
+    public CodeAnalysisResult AnalyzeUserCode()
+    {
+        AstNodeClassMemberFunc? main = FindMainFunction();
         
-        foreach (var nodeClass in _programRoot.ProgramClasses)
+        MainMethod? mainMethod = MainMethod.MakeFromAstNodeMain(main);
+        string className = GetClassName();
+        bool validatedTemplateFunctions = _templateProgramRoot == null ||  ValidateTemplateFunctions();
+        
+        return new CodeAnalysisResult(mainMethod, className, validatedTemplateFunctions);
+    }
+    
+    private AstNodeClassMemberFunc? FindMainFunction()
+    {
+        foreach (var nodeClass in _userProgramRoot.ProgramClasses)
         {
             foreach (AstNodeClassMember member in nodeClass.ClassScope.ClassMembers)
             {
@@ -49,32 +75,53 @@ public class AnalyzerSimple : IAnalyzer
         return null;
     }
 
-    public string GetClassName()
+    private bool ValidateTemplateFunctions()
     {
-        if (_programRoot == null)
+        bool foundMatch = false;
+        foreach (var currClass in _templateProgramRoot.ProgramClasses)
         {
-            throw new NullReferenceException("program must be parsed first");
+            foreach (var classMember in currClass.ClassScope.ClassMembers)
+            {
+                classMember.ClassMember.Switch(
+                    t0 => foundMatch = FindAndCompareFunc(t0, _userProgramRoot) != null,
+                    _ => { }
+                );
+                if (foundMatch)
+                {
+                    return true;
+                }
+            }
         }
-        return _programRoot.ProgramClasses[0].Identifier.Value;
+
+        return foundMatch;
     }
 
-
-    private AstNodeClassMemberFunc _baselineMainSignature = new()
+    private AstNodeClassMemberFunc? FindAndCompareFunc(AstNodeClassMemberFunc baselineFunc, AstNodeProgram toBeSearched)
     {
-        AccessModifier = AccessModifier.Public,
-        Modifiers = [MemberModifier.Static],
-        FuncReturnType = SpecialMemberType.Void,
-        Identifier = new Token(TokenType.Ident, 0, "main"),
-        FuncArgs =
-        [
-            new AstNodeScopeMemberVar()
+        foreach (var programClass in toBeSearched.ProgramClasses)
+        {
+            List<AstNodeClassMemberFunc> matchedFunctions = programClass.ClassScope.ClassMembers
+                .Where(func => func.ClassMember.IsT0 && func.ClassMember.AsT0.Identifier.Value.Equals(baselineFunc.Identifier.Value))
+                .Select(func => func.ClassMember.AsT0)
+                .ToList();
+            foreach (var matchedFunction in matchedFunctions)
             {
-                Type = new ArrayType() { BaseType = MemberType.String, Dim = 1 },
-                Identifier = new Token(TokenType.Ident, 0, "args")
+                if (ValidateFunctionSignature(baselineFunc, matchedFunction))
+                {
+                    return matchedFunction;
+                }
             }
-        ],
-    };
-    public bool ValidateFunctionSignature(AstNodeClassMemberFunc baseline, AstNodeClassMemberFunc compared)
+        }
+
+        return null;
+    }
+
+    public string GetClassName()
+    {
+        return _userProgramRoot.ProgramClasses[0].Identifier.Value; //currently presumes only one class per file, naive but this is a simple parser not without cause
+    }
+    
+    private bool ValidateFunctionSignature(AstNodeClassMemberFunc baseline, AstNodeClassMemberFunc compared)
     {
         if (baseline.AccessModifier != compared.AccessModifier)
         {

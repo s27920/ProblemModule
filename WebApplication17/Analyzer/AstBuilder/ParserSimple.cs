@@ -12,6 +12,13 @@ public class ParserSimple : IParser
 {
     private int _currPos;
     private List<Token> _tokens;
+    
+    private static readonly HashSet<TokenType> SimpleTypes =
+    [
+        TokenType.Byte, TokenType.Short, TokenType.Int, TokenType.Long,
+        TokenType.Float, TokenType.Double, TokenType.Char,
+        TokenType.Boolean, TokenType.String
+    ];
 
     public AstNodeProgram ParseProgram(List<Token> tokens)
     {
@@ -46,14 +53,13 @@ public class ParserSimple : IParser
         
     }
 
-    private AstNodeCLassScope? ParseClassScope()
+    private AstNodeCLassScope ParseClassScope()
     {
 
         AstNodeCLassScope classScope = new()
         {
             ScopeBeginOffset = ConsumeIfOfType(TokenType.OpenCurly, "'{'").FilePos
         };
-
         
         while (!CheckTokenType(TokenType.CloseCurly))
         {
@@ -66,7 +72,6 @@ public class ParserSimple : IParser
 
     private AstNodeClassMember ParseClassMember()
     {
-
         int forwardOffset = 0;
         while (!CheckTokenType(TokenType.Ident, forwardOffset))
         {
@@ -99,15 +104,13 @@ public class ParserSimple : IParser
 
         memberFunc.Modifiers = ParseModifiers();
 
-
-        OneOf<MemberType,SpecialMemberType, ArrayType>? type = TokenIsType(PeekToken());
+        OneOf<MemberType,SpecialMemberType, ArrayType>? type = ParseType();
 
         if (type == null)
         {
             throw new JavaSyntaxException("return type required");
         }
 
-        ConsumeToken();
         memberFunc.FuncReturnType = type.Value;
 
         memberFunc.Identifier = ConsumeIfOfType(TokenType.Ident, "identifier");
@@ -124,6 +127,7 @@ public class ParserSimple : IParser
 
         ConsumeIfOfType(TokenType.CloseParen, "')'");
 
+
         memberFunc.FuncScope = ParseStatementScope();
         return memberFunc;
     }
@@ -131,9 +135,8 @@ public class ParserSimple : IParser
     private List<MemberModifier> ParseModifiers()
     {
         List<MemberModifier> modifiers = new();
-        while (TokenIsType(PeekToken()) == null)
+        while (!TokenIsType(PeekToken()))
         {
-
             MemberModifier? modifier;
             if ((modifier = TokenIsModifier(PeekToken())) != null)
             {
@@ -148,6 +151,7 @@ public class ParserSimple : IParser
     private AstNodeScopeMemberVar ParseScopeMemberVariableDeclaration(MemberModifier[] permittedModifiers)
     {
         AstNodeScopeMemberVar scopedVar = new();
+
         List<MemberModifier> modifiers = ParseModifiers();
 
         foreach (MemberModifier modifier in modifiers)
@@ -157,41 +161,19 @@ public class ParserSimple : IParser
                 throw new JavaSyntaxException("Illegal modifier");
             }
         }
-
-        MemberType? memberType = TokenIsSimpleType(PeekToken());
-        ConsumeToken();
         
-        if (memberType is null)
-        {
-            throw new JavaSyntaxException("type expected");
-        }
+        var parseVar = ParseType().Value;
         
-        int dim = 0;
-        if (CheckTokenType(TokenType.OpenBrace) && CheckTokenType(TokenType.CloseBrace, 1)) //TODO abstract this
+        scopedVar.Type = parseVar switch
         {
-            ConsumeToken();
-            ConsumeToken();
-            dim++;
-            while (CheckTokenType(TokenType.OpenBrace) && CheckTokenType(TokenType.CloseBrace, 1))
-            {
-                dim++;
-                ConsumeToken();
-                ConsumeToken();
-            }
-            scopedVar.Type = new ArrayType()
-            {
-                BaseType = memberType.Value,
-                Dim = dim
-            };
-        }
-        else
-        {
-            scopedVar.Type = memberType.Value;
-        }
+            { IsT0: true } => parseVar.AsT0,
+            { IsT1: true } => throw new JavaSyntaxException("cannot declare variable of type void"), 
+            { IsT2: true } => parseVar.AsT2,
+            _ => throw new ArgumentOutOfRangeException()
+        };
         
         scopedVar.VarModifiers = modifiers;
-        scopedVar.Identifier = ConsumeIfOfType(TokenType.Ident, "ident");
-        //TODO important add literal value parsing to allow for actual declarations, left blank for now
+        scopedVar.Identifier = ConsumeIfOfType(TokenType.Ident, "ident"); //TODO important add literal value parsing to allow for actual declarations, left blank for now
         return scopedVar;
     }
 
@@ -234,6 +216,7 @@ public class ParserSimple : IParser
     }
     private AstNodeStatementScope ParseStatementScope()
     {
+
         AstNodeStatementScope scope = new()
         {
             ScopeBeginOffset = ConsumeIfOfType(TokenType.OpenCurly, "'{'").FilePos //consume '{' token
@@ -249,7 +232,26 @@ public class ParserSimple : IParser
         
         return scope;
     }
-    
+
+    private Token[] TryConsumeNTokens(int amount = 1)
+    {
+        Token[] consumedTokens = new Token[amount];
+        for (int i = 0; i < amount; i++)
+        {
+            consumedTokens[i] = TryConsume();
+        }
+
+        return consumedTokens;
+    }
+    private Token TryConsume()
+    {
+        if (PeekToken() != null)
+        {
+            return ConsumeToken();
+        }
+
+        throw new JavaSyntaxException("token expected");
+    }
     private Token ConsumeToken()
     {
         if (_currPos >= _tokens.Count)
@@ -328,41 +330,67 @@ public class ParserSimple : IParser
         };
 
     }
-    private OneOf<MemberType, SpecialMemberType, ArrayType>? TokenIsType(Token? token) //TODO name is not really descriptive, not to me at least, change it
+
+    private OneOf<MemberType, SpecialMemberType, ArrayType>? ParseType()
+    {
+        Token token = TryConsume();
+        
+        if (TokenIsSimpleType(token))
+        {
+            MemberType type = ParseSimpleType(token);
+            int dim = 0;
+            if (CheckTokenType(TokenType.OpenBrace) && CheckTokenType(TokenType.CloseBrace, 1))
+            {
+                TryConsumeNTokens(2);
+                dim++;
+                while (CheckTokenType(TokenType.OpenBrace) && CheckTokenType(TokenType.CloseBrace, 1))
+                {
+                    dim++;
+                    TryConsumeNTokens(2);
+                }
+                return new ArrayType()
+                {
+                    BaseType = type,
+                    Dim = dim
+                };
+            }
+
+            return type;
+
+        }else if (token.Type == TokenType.Void)
+        {
+            return SpecialMemberType.Void;
+        }
+
+        return null;
+    }
+    
+    private bool TokenIsType(Token? token) //TODO name is not really descriptive, not to me at least, change it
     {
         if (token == null)
         {
-            return null;
+            throw new JavaSyntaxException("bro what is this");
         }
         
-        MemberType? memberType = TokenIsSimpleType(token);
-
-        
-        if (memberType is null)
+        if (TokenIsSimpleType(token) || token.Type == TokenType.Void)
         {
-            if (token.Type == TokenType.Void)
-            {
-                return SpecialMemberType.Void;
-            }
-
-            return null;
+            return true;
         }
-        
-       
-        
-        return memberType;
+        return false;
     }
 
-    private MemberType? TokenIsSimpleType(Token? token)
+    private bool TokenIsSimpleType(Token? token)
     {
-
-        MemberType? result = null;
         if (token is null)
         {
-            return result;
+            throw new JavaSyntaxException("again what are you even giving me?");
         }
         
-
+        return SimpleTypes.Contains(token.Type);
+    }
+    
+    private MemberType ParseSimpleType(Token token)
+    {
         return token.Type switch
         {
             TokenType.Byte => MemberType.Byte,
@@ -374,7 +402,7 @@ public class ParserSimple : IParser
             TokenType.Char => MemberType.Char,
             TokenType.Boolean => MemberType.Boolean,
             TokenType.String => MemberType.String,
-            _ => null
+            _ => throw new ArgumentOutOfRangeException()
         };
     }
 }

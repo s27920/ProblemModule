@@ -3,7 +3,7 @@ using System.Text;
 using Microsoft.Win32.SafeHandles;
 using Polly;
 using Polly.Timeout;
-using WebApplication17.Analyzer;
+using WebApplication17.Analyzer._AnalyzerUtils;
 using WebApplication17.Analyzer.AstAnalyzer;
 
 namespace WebApplication17.Executor;
@@ -17,28 +17,44 @@ public interface IExecutorService
 
 public class ExecutorService(IExecutorRepository executorRepository) : IExecutorService
 {
-    private const string javaImport = "import com.google.gson.Gson;\n"; //TODO this is temporary, not the gson but the way it's imported
+    private const string JavaImport = "import com.google.gson.Gson;\n"; //TODO this is temporary, not the gson but the way it's imported
     
     private readonly ExecutorConfig _config = new ExecutorConfig(); //TODO use this to check language selection
-    private readonly IAnalyzer _analyzer = new AnalyzerSimple();
+    private IAnalyzer? _analyzer;
+    private CodeAnalysisResult? _codeAnalysisResult;
     
     private readonly IExecutorRepository _executorRepository = executorRepository;
     public async Task<ExecuteResultDto> FullExecute(ExecuteRequestDto executeRequestDto)
     {
-        var fileData = await PrepareFile(executeRequestDto);
-
-        _analyzer.BuildAstFromFileContents(executeRequestDto.Code);
-        var offset = _analyzer.FindMainFunction().FuncScope.ScopeEndOffset;
-
-        await InsertTestCases(fileData, offset);
+        _analyzer = new AnalyzerSimple(executeRequestDto.Code, await _executorRepository.GetTemplateAsync());
         
+        _codeAnalysisResult = _analyzer.AnalyzeUserCode();
+        
+        if (!_codeAnalysisResult.PassedValidation)
+        {
+            return new ExecuteResultDto("", "critical function signature modified. Exiting.");
+        }
+        SrcFileData fileData = await PrepareFile(executeRequestDto);
+
+        if (_codeAnalysisResult.MainMethodIndices is not null)
+        {
+            await InsertTestCases(fileData, _codeAnalysisResult.MainMethodIndices.MethodFileEndIndex);
+        }
+        else
+        {
+            //TODO temporary solution I'd like to insert a main if it's not found to test either way
+            return new ExecuteResultDto("", "no main found. Exiting");
+        }
+
         return (await Exec(fileData));
     }
 
     public async Task<ExecuteResultDto> DryExecute(ExecuteRequestDto executeRequestDto)
     {
+        _analyzer = new AnalyzerSimple(executeRequestDto.Code);
+        _codeAnalysisResult = _analyzer.AnalyzeUserCode();
+        
         var fileData = await PrepareFile(executeRequestDto);
-        _analyzer.BuildAstFromFileContents(executeRequestDto.Code);
         return await Exec(fileData);
     }
 
@@ -50,7 +66,7 @@ public class ExecutorService(IExecutorRepository executorRepository) : IExecutor
             StartInfo = new ProcessStartInfo()
             {
                 FileName = "/bin/sh",
-                Arguments = $"\"./scripts/deploy-executor-container.sh\" \"{srcFileData.Lang}\" \"{srcFileData.Guid.ToString()}\" \"{_analyzer.GetClassName()}\"",
+                Arguments = $"\"./scripts/deploy-executor-container.sh\" \"{srcFileData.Lang}\" \"{srcFileData.Guid.ToString()}\" \"{_codeAnalysisResult!.MainClassName}\"", //never actually gonna be null which is why I threw that ! in
                 RedirectStandardError = true,
                 RedirectStandardOutput = true,
                 RedirectStandardInput = true,
@@ -103,7 +119,7 @@ public class ExecutorService(IExecutorRepository executorRepository) : IExecutor
 
         var fileData = new SrcFileData(Guid.NewGuid(), executeRequest.Lang, funcName);
 
-        await File.WriteAllTextAsync(fileData.FilePath, javaImport);
+        await File.WriteAllTextAsync(fileData.FilePath, JavaImport);
         await File.WriteAllTextAsync(fileData.FilePath, executeRequest.Code);
         
         return fileData;

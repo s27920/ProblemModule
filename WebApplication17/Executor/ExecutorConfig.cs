@@ -19,7 +19,7 @@ public class ExecutorConfig : IExecutorConfig
     public ExecutorConfig()
     {
         IExecutorRepository executorRepository = new ExecutorRepositoryMock();
-        _supportedLanguages = executorRepository.GetSupportedLangs(); 
+        _supportedLanguages = executorRepository.GetSupportedLangsAsync().Result; 
         BuildImages();
     }
     

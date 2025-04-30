@@ -70,10 +70,11 @@ public class LexerSimple : ILexer
             }
         }
 
-        // foreach (var tok in _tokens)
-        // {
-        //     Console.WriteLine(tok.Type);
-        // }
+        foreach (var tok in _tokens)
+        {
+            Console.WriteLine(tok.Type);
+        }
+        Console.WriteLine("\n\n\n\n\n\n\n\n\n\n\n\n\n\n");
         return _tokens;
     }
     
