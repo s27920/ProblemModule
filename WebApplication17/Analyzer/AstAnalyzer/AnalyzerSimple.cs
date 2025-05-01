@@ -31,7 +31,7 @@ public class AnalyzerSimple : IAnalyzer
             }
         ],
     };
-
+    
     public AnalyzerSimple(string fileContents)
     {
         _lexerSimple = new LexerSimple();
@@ -39,14 +39,14 @@ public class AnalyzerSimple : IAnalyzer
         
         _userProgramRoot = _parserSimple.ParseProgram(_lexerSimple.Tokenize(fileContents));
     }
-    
+
     public AnalyzerSimple(string fileContents, string templateContents)
     {
         _lexerSimple = new LexerSimple();
         _parserSimple = new ParserSimple();
 
-        _userProgramRoot = _parserSimple.ParseProgram(_lexerSimple.Tokenize(fileContents));
         _templateProgramRoot = _parserSimple.ParseProgram(_lexerSimple.Tokenize(templateContents));
+        _userProgramRoot = _parserSimple.ParseProgram(_lexerSimple.Tokenize(fileContents));
     }
 
     public CodeAnalysisResult AnalyzeUserCode()
@@ -62,14 +62,24 @@ public class AnalyzerSimple : IAnalyzer
     
     private AstNodeClassMemberFunc? FindMainFunction()
     {
-        foreach (var nodeClass in _userProgramRoot.ProgramClasses)
+        foreach (var topLevelStatement in _userProgramRoot.ProgramClasses)
         {
-            foreach (AstNodeClassMember member in nodeClass.ClassScope.ClassMembers)
+            AstNodeClass? currClass = topLevelStatement switch
             {
-                if (member.ClassMember.IsT0 && ValidateFunctionSignature(_baselineMainSignature, member.ClassMember.AsT0))
+                { IsT0: true } => topLevelStatement.AsT0,
+                { IsT1: true } => null,
+                _ => throw new ArgumentOutOfRangeException()
+            };
+
+            if (currClass is not null)
+            {
+                foreach (AstNodeClassMember member in currClass.ClassScope.ClassMembers)
                 {
-                    return member.ClassMember.AsT0;
-                }
+                    if (member.ClassMember.IsT0 && ValidateFunctionSignature(_baselineMainSignature, member.ClassMember.AsT0))
+                    {
+                        return member.ClassMember.AsT0;
+                    }
+                }    
             }
         }
         return null;
@@ -78,17 +88,27 @@ public class AnalyzerSimple : IAnalyzer
     private bool ValidateTemplateFunctions()
     {
         bool foundMatch = false;
-        foreach (var currClass in _templateProgramRoot.ProgramClasses)
+        foreach (var topLevelStatement in _templateProgramRoot.ProgramClasses)
         {
-            foreach (var classMember in currClass.ClassScope.ClassMembers)
+            AstNodeClass? currClass = topLevelStatement switch
             {
-                classMember.ClassMember.Switch(
-                    t0 => foundMatch = FindAndCompareFunc(t0, _userProgramRoot) != null,
-                    _ => { }
-                );
-                if (foundMatch)
+                { IsT0: true } => topLevelStatement.AsT0,
+                { IsT1: true } => null,
+                _ => throw new ArgumentOutOfRangeException()
+            };
+
+            if (currClass is not null)
+            {
+                foreach (var classMember in currClass.ClassScope.ClassMembers)
                 {
-                    return true;
+                    classMember.ClassMember.Switch(
+                        t0 => foundMatch = FindAndCompareFunc(t0, _userProgramRoot) != null,
+                        _ => { }
+                    );
+                    if (foundMatch)
+                    {
+                        return true;
+                    }
                 }
             }
         }
@@ -98,17 +118,26 @@ public class AnalyzerSimple : IAnalyzer
 
     private AstNodeClassMemberFunc? FindAndCompareFunc(AstNodeClassMemberFunc baselineFunc, AstNodeProgram toBeSearched)
     {
-        foreach (var programClass in toBeSearched.ProgramClasses)
+        foreach (var topLevelStatement in toBeSearched.ProgramClasses)
         {
-            List<AstNodeClassMemberFunc> matchedFunctions = programClass.ClassScope.ClassMembers
-                .Where(func => func.ClassMember.IsT0 && func.ClassMember.AsT0.Identifier.Value.Equals(baselineFunc.Identifier.Value))
-                .Select(func => func.ClassMember.AsT0)
-                .ToList();
-            foreach (var matchedFunction in matchedFunctions)
+            AstNodeClass? currClass = topLevelStatement switch
             {
-                if (ValidateFunctionSignature(baselineFunc, matchedFunction))
+                { IsT0: true } => topLevelStatement.AsT0,
+                { IsT1: true } => null,
+                _ => throw new ArgumentOutOfRangeException()
+            };
+            if (currClass is not null)
+            {
+                List<AstNodeClassMemberFunc> matchedFunctions = currClass.ClassScope.ClassMembers
+                    .Where(func => func.ClassMember.IsT0 && func.ClassMember.AsT0.Identifier.Value.Equals(baselineFunc.Identifier.Value))
+                    .Select(func => func.ClassMember.AsT0)
+                    .ToList();
+                foreach (var matchedFunction in matchedFunctions)
                 {
-                    return matchedFunction;
+                    if (ValidateFunctionSignature(baselineFunc, matchedFunction))
+                    {
+                        return matchedFunction;
+                    }
                 }
             }
         }
@@ -116,9 +145,17 @@ public class AnalyzerSimple : IAnalyzer
         return null;
     }
 
-    public string GetClassName()
+    private string GetClassName()
     {
-        return _userProgramRoot.ProgramClasses[0].Identifier.Value; //currently presumes only one class per file, naive but this is a simple parser not without cause
+        foreach (var topLevelStatement in _userProgramRoot.ProgramClasses)
+        {
+            if (topLevelStatement.IsT0)
+            {
+                return topLevelStatement.AsT0.Identifier.Value; //currently presumes only one class per file, naive but this is a simple parser not without cause
+            }
+        }
+
+        throw new JavaSyntaxException("no class found");
     }
     
     private bool ValidateFunctionSignature(AstNodeClassMemberFunc baseline, AstNodeClassMemberFunc compared)

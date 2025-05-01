@@ -37,6 +37,11 @@ public enum MemberModifier
     Static, Final
 }
 
+public enum TopLevelStatement
+{
+    Import, Package
+}
+
 public class ArrayType
 {
     public OneOf<MemberType> BaseType { get; set; }
@@ -45,7 +50,13 @@ public class ArrayType
 
 public class AstNodeProgram
 {
-    public List<AstNodeClass> ProgramClasses { get; set; } = new List<AstNodeClass>();
+    public List<OneOf<AstNodeClass, AstNodeTopLevelStat>> ProgramClasses { get; set; } = new(); //TODO change this, confusing naming
+}
+
+public class AstNodeTopLevelStat
+{
+    public TopLevelStatement TopLevelStatement { get; set; }
+    public string? Uri { get; set; }
 }
 
 public class AstNodeClass

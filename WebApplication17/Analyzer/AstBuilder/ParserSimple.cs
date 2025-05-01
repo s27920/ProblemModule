@@ -1,3 +1,4 @@
+using System.Text;
 using OneOf;
 using WebApplication17.Analyzer._AnalyzerUtils;
 
@@ -11,7 +12,7 @@ public interface IParser
 public class ParserSimple : IParser
 {
     private int _currPos;
-    private List<Token> _tokens;
+    private List<Token> _tokens = new();
     
     private static readonly HashSet<TokenType> SimpleTypes =
     [
@@ -27,10 +28,27 @@ public class ParserSimple : IParser
         AstNodeProgram program = new();
         while (PeekToken() is not null)
         {
-            program.ProgramClasses.Add(ParseClass());   
+            program.ProgramClasses.Add(ParseTopLevelStatement()); //TODO might have to change this name   
         }
 
         return program;
+    }
+
+    private OneOf<AstNodeClass,AstNodeTopLevelStat> ParseTopLevelStatement()
+    {
+        int lookahead = 0;
+        Token? peekedToken = PeekToken(); //I know double null check here on iter 0, might clean this up later, no clean idea for it now
+        while (peekedToken is not null && !(peekedToken.Type == TokenType.Import || peekedToken.Type == TokenType.Package || peekedToken.Type == TokenType.Class))
+        {
+            peekedToken = PeekToken(++lookahead);
+        }
+        return PeekToken(lookahead)!.Type switch
+        {
+            TokenType.Import => ParseTopLevelStat(),
+            TokenType.Package => ParseTopLevelStat(),
+            TokenType.Class => ParseClass(),
+            _ => throw new ArgumentOutOfRangeException()
+        };
     }
 
     private AstNodeClass ParseClass()
@@ -48,9 +66,33 @@ public class ParserSimple : IParser
         nodeClass.Identifier = ConsumeIfOfType(TokenType.Ident, "class name"); //again no, but thanks rider
         nodeClass.ClassScope = ParseClassScope();
 
-
         return nodeClass;
-        
+    }
+
+    private AstNodeTopLevelStat ParseTopLevelStat() //TODO in Gods name I command thee change this naming
+    { 
+        //currently parses only imports
+        ConsumeIfOfType(TokenType.Import, "import");
+        StringBuilder uriBuilder = new StringBuilder();
+        while (true)
+        {
+            uriBuilder.Append(ConsumeIfOfType(TokenType.Ident, "uri segment").Value);
+            if (CheckTokenType(TokenType.Dot))
+            {
+                ConsumeToken();
+                uriBuilder.Append(".");
+            }
+            else if (CheckTokenType(TokenType.Semi))
+            {
+                ConsumeToken();
+                break;
+            }
+        }
+
+        return new AstNodeTopLevelStat()
+        {
+            TopLevelStatement = TopLevelStatement.Import, Uri = uriBuilder.ToString()
+        };
     }
 
     private AstNodeCLassScope ParseClassScope()
@@ -121,6 +163,10 @@ public class ParserSimple : IParser
         while (!CheckTokenType(TokenType.CloseParen))
         {
             funcArguments.Add(ParseScopeMemberVariableDeclaration([MemberModifier.Final]));
+            if (CheckTokenType(TokenType.Comma))
+            {
+                ConsumeToken();
+            }
         }
 
         memberFunc.FuncArgs = funcArguments;
@@ -162,13 +208,18 @@ public class ParserSimple : IParser
             }
         }
         
-        var parseVar = ParseType().Value;
+        var parseVar = ParseType();
+
+        if (parseVar == null)
+        {
+            throw new JavaSyntaxException("Type required");
+        }
         
         scopedVar.Type = parseVar switch
         {
-            { IsT0: true } => parseVar.AsT0,
+            { IsT0: true } => parseVar.Value.AsT0,
             { IsT1: true } => throw new JavaSyntaxException("cannot declare variable of type void"), 
-            { IsT2: true } => parseVar.AsT2,
+            { IsT2: true } => parseVar.Value.AsT2,
             _ => throw new ArgumentOutOfRangeException()
         };
         
@@ -357,7 +408,8 @@ public class ParserSimple : IParser
 
             return type;
 
-        }else if (token.Type == TokenType.Void)
+        }
+        if (token.Type == TokenType.Void)
         {
             return SpecialMemberType.Void;
         }

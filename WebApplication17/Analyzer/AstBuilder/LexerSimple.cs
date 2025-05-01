@@ -60,21 +60,30 @@ public class LexerSimple : ILexer
                 case ';':
                     _tokens.Add(CreateToken(TokenType.Semi));
                     break;
+                case '.':
+                    _tokens.Add(CreateToken(TokenType.Dot));
+                    break;
+                case ',':
+                    _tokens.Add(CreateToken(TokenType.Comma));
+                    break;
+                    
                 default:
                     if (Char.IsLetter(consumedChar))
                     {
                         _buf.Append(consumedChar);
                         _tokens.Add(ConsumeKeyword(_buf));
-                    }else if (Char.IsWhiteSpace(consumedChar)) { }
+                    }else if (Char.IsWhiteSpace(consumedChar))
+                    {
+                        
+                    }
                     break;
             }
         }
 
-        foreach (var tok in _tokens)
-        {
-            Console.WriteLine(tok.Type);
-        }
-        Console.WriteLine("\n\n\n\n\n\n\n\n\n\n\n\n\n\n");
+        // foreach (var tok in _tokens)
+        // {
+            // Console.WriteLine(tok.Type);
+        // }
         return _tokens;
     }
     
@@ -105,6 +114,7 @@ public class LexerSimple : ILexer
             "final" => CreateToken(TokenType.Final),
             "class" => CreateToken(TokenType.Class),
             "String" => CreateToken(TokenType.String),
+            "import" => CreateToken(TokenType.Import),
             _ => CreateToken(TokenType.Ident, result),
         };
         buf.Clear();

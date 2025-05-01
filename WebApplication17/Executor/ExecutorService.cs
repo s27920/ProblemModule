@@ -15,18 +15,17 @@ public interface IExecutorService
 }
 
 
-public class ExecutorService(IExecutorRepository executorRepository) : IExecutorService
+public class ExecutorService(IExecutorRepository executorRepository, IExecutorConfig executorConfig) : IExecutorService
 {
-    private const string JavaImport = "import com.google.gson.Gson;\n"; //TODO this is temporary, not the gson but the way it's imported
+    private const string JavaImport = "import com.google.gson.Gson;\n\n"; //TODO this is temporary, not the gson but the way it's imported
     
-    private readonly ExecutorConfig _config = new ExecutorConfig(); //TODO use this to check language selection
+    private readonly IExecutorConfig _config = executorConfig; //TODO use this to check language selection
     private IAnalyzer? _analyzer;
     private CodeAnalysisResult? _codeAnalysisResult;
-    
-    private readonly IExecutorRepository _executorRepository = executorRepository;
+
     public async Task<ExecuteResultDto> FullExecute(ExecuteRequestDto executeRequestDto)
     {
-        _analyzer = new AnalyzerSimple(executeRequestDto.Code, await _executorRepository.GetTemplateAsync());
+        _analyzer = new AnalyzerSimple(executeRequestDto.Code, await executorRepository.GetTemplateAsync());
         
         _codeAnalysisResult = _analyzer.AnalyzeUserCode();
         
@@ -46,6 +45,7 @@ public class ExecutorService(IExecutorRepository executorRepository) : IExecutor
             return new ExecuteResultDto("", "no main found. Exiting");
         }
 
+        return new ExecuteResultDto($"{await File.ReadAllTextAsync(fileData.FilePath)}", "");
         return (await Exec(fileData));
     }
 
@@ -134,7 +134,7 @@ public class ExecutorService(IExecutorRepository executorRepository) : IExecutor
 
     private async Task InsertTestCases(SrcFileData srcFileData, int writeOffset)
     {
-        TestCase[] testCases = await _executorRepository.GetTestCasesAsync();
+        TestCase[] testCases = await executorRepository.GetTestCasesAsync();
 
         using SafeFileHandle handle = File.OpenHandle(srcFileData.FilePath, FileMode.Open, FileAccess.ReadWrite, FileShare.ReadWrite);
 

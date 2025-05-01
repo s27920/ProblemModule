@@ -17,6 +17,10 @@ public enum TokenType
     FloatLit, DoubleLit, CharLit, BooleanLit, IntLit, LongLit, ShortLit, ByteLit,
     
     Static, Final,
+    
+    Import, Package,
+    
+    Dot, Comma,
 
 
 
