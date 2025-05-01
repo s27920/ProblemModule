@@ -21,7 +21,5 @@ public enum TokenType
     Import, Package,
     
     Dot, Comma,
-
-
-
+    
 }

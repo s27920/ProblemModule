@@ -39,6 +39,4 @@ public class ExecutorConfig : IExecutorConfig
         buildProcess.Start();
         buildProcess.WaitForExit();
     }
-
-    
 }
