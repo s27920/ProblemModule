@@ -25,7 +25,9 @@ public class ExecutorService(IExecutorRepository executorRepository, IExecutorCo
 
     public async Task<ExecuteResultDto> FullExecute(ExecuteRequestDto executeRequestDto)
     {
-        _analyzer = new AnalyzerSimple(executeRequestDto.Code, await executorRepository.GetTemplateAsync());
+        SrcFileData fileData = await PrepareFile(executeRequestDto);
+
+        _analyzer = new AnalyzerSimple(await File.ReadAllTextAsync(fileData.FilePath), await executorRepository.GetTemplateAsync());
         
         _codeAnalysisResult = _analyzer.AnalyzeUserCode();
         
@@ -33,8 +35,7 @@ public class ExecutorService(IExecutorRepository executorRepository, IExecutorCo
         {
             return new ExecuteResultDto("", "critical function signature modified. Exiting.");
         }
-        SrcFileData fileData = await PrepareFile(executeRequestDto);
-
+        
         if (_codeAnalysisResult.MainMethodIndices is not null)
         {
             await InsertTestCases(fileData, _codeAnalysisResult.MainMethodIndices.MethodFileEndIndex);
@@ -45,7 +46,7 @@ public class ExecutorService(IExecutorRepository executorRepository, IExecutorCo
             return new ExecuteResultDto("", "no main found. Exiting");
         }
 
-        return new ExecuteResultDto($"{await File.ReadAllTextAsync(fileData.FilePath)}", "");
+        // return new ExecuteResultDto($"{await File.ReadAllTextAsync(fileData.FilePath)}", ""); /*[DEBUG]*/
         return (await Exec(fileData));
     }
 
@@ -55,6 +56,7 @@ public class ExecutorService(IExecutorRepository executorRepository, IExecutorCo
         _codeAnalysisResult = _analyzer.AnalyzeUserCode();
         
         var fileData = await PrepareFile(executeRequestDto);
+        // return new ExecuteResultDto(await File.ReadAllTextAsync(fileData.FilePath), ""); /*[DEBUG]*/
         return await Exec(fileData);
     }
 
@@ -108,7 +110,7 @@ public class ExecutorService(IExecutorRepository executorRepository, IExecutorCo
         return new ExecuteResultDto(output, error);
     }
 
-    private async Task<SrcFileData> PrepareFile(ExecuteRequestDto executeRequest)
+    private async Task<SrcFileData> PrepareFile(ExecuteRequestDto executeRequest) //TODO Make the import not constant
     {
         string funcName = GetFuncSignature();
         
@@ -120,7 +122,7 @@ public class ExecutorService(IExecutorRepository executorRepository, IExecutorCo
         var fileData = new SrcFileData(Guid.NewGuid(), executeRequest.Lang, funcName);
 
         await File.WriteAllTextAsync(fileData.FilePath, JavaImport);
-        await File.WriteAllTextAsync(fileData.FilePath, executeRequest.Code);
+        await File.AppendAllTextAsync(fileData.FilePath, executeRequest.Code);
         
         return fileData;
     }
