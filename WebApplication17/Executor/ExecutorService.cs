@@ -47,7 +47,7 @@ public class ExecutorService(IExecutorRepository executorRepository, IExecutorCo
         }
 
         // return new ExecuteResultDto($"{await File.ReadAllTextAsync(fileData.FilePath)}", ""); /*[DEBUG]*/
-        return (await Exec(fileData));
+        return await Exec(fileData);
     }
 
     public async Task<ExecuteResultDto> DryExecute(ExecuteRequestDto executeRequestDto)
@@ -112,26 +112,12 @@ public class ExecutorService(IExecutorRepository executorRepository, IExecutorCo
 
     private async Task<SrcFileData> PrepareFile(ExecuteRequestDto executeRequest) //TODO Make the import not constant
     {
-        string funcName = GetFuncSignature();
-        
-        if (!ValidateFileContents())
-        {
-            throw new FunctionSignatureException(null);
-        }
-
-        var fileData = new SrcFileData(Guid.NewGuid(), executeRequest.Lang, funcName);
+        var fileData = new SrcFileData(Guid.NewGuid(), executeRequest.Lang, await executorRepository.GetFuncName());
 
         await File.WriteAllTextAsync(fileData.FilePath, JavaImport);
         await File.AppendAllTextAsync(fileData.FilePath, executeRequest.Code);
         
         return fileData;
-    }
-    
-
-    private bool ValidateFileContents()
-    {
-        return true;
-        //TODO for now let's all pass, gonna use AST later on.
     }
 
     private async Task InsertTestCases(SrcFileData srcFileData, int writeOffset)
@@ -149,23 +135,16 @@ public class ExecutorService(IExecutorRepository executorRepository, IExecutorCo
 
         foreach (var testCase in testCases)
         {
-            string comparingStat = "System.out.println(\"hello from comparer\");\n";
-            testCaseInsertBuilder.Append(comparingStat);
-            
-            //TODO add actual comparisons
-            // string comparingStatement = "System.out.println(gson.toJson(\"hello from comparer\"));\n"u8.ToArray();
+            // string comparingStatement = "System.out.println(\"hello from comparer\");\n";/*[DEBUG]*/
+            // string comparingStatement = "System.out.println(gson.toJson(\"hello from comparer\"));\n"; /*[DEBUG]*/
+            string comparingStatement =
+                $"System.out.println(gson.toJson({testCase.ExpectedOutput}).equals(gson.toJson(sortIntArr({testCase.TestInput}))));\n";
+            testCaseInsertBuilder.Append(comparingStatement);
         }
         
         byte[] insertionBytes = Encoding.UTF8.GetBytes(testCaseInsertBuilder.ToString());
         byte[] combinedBytes = insertionBytes.Concat(fileTail).ToArray();
         
         await RandomAccess.WriteAsync(handle, combinedBytes, writeOffset);
-    }
-
-    private string GetFuncSignature()
-    {
-        // TODO fetch and parse file template, for now hardcoded
-        string funcName = "func";
-        return funcName;
     }
 }
