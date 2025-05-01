@@ -36,7 +36,8 @@ RUN wget https://dot.net/v1/dotnet-install.sh -O dotnet-install.sh -O dotnet-ins
     chmod +x ./dotnet-install.sh && \
     ./dotnet-install.sh --channel 8.0 --install-dir /usr/share/dotnet && \
     ln -s /usr/share/dotnet/dotnet /usr/bin/dotnet && \
-    rm dotnet-install.sh
+    rm dotnet-install.sh &&\
+    curl -s https://raw.githubusercontent.com/nestybox/sysbox/master/install.sh 
     
 WORKDIR /app
 COPY --from=publish /app/publish .
