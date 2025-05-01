@@ -2,8 +2,6 @@ FROM openjdk:17-jdk-alpine
 
 WORKDIR /app
 
-# TODO why is this a "_" instead of "-"
-
 ENV SRC_FILENAME=code
 ENV FILE_EXTENSION=java
 
@@ -20,4 +18,3 @@ RUN chmod +x execute-java.sh && \
 
 #TODO probs make this a custom entrypoint
 ENTRYPOINT ["/bin/sh", "-c", "./stdin-receiver.sh ${FILE_EXTENSION} ${SRC_FILENAME} && ./execute-java.sh  ${SRC_FILENAME}"] 
-#code in here is the src filename 

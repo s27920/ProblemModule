@@ -210,6 +210,7 @@ public class ParserSimple : IParser
         
         var parseVar = ParseType();
 
+        
         if (parseVar == null)
         {
             throw new JavaSyntaxException("Type required");
@@ -224,7 +225,24 @@ public class ParserSimple : IParser
         };
         
         scopedVar.VarModifiers = modifiers;
-        scopedVar.Identifier = ConsumeIfOfType(TokenType.Ident, "ident"); //TODO important add literal value parsing to allow for actual declarations, left blank for now
+        scopedVar.Identifier = ConsumeIfOfType(TokenType.Ident, "ident"); 
+        if (CheckTokenType(TokenType.Assign))//TODO suboptimal
+        {
+            ConsumeToken();
+            while (!CheckTokenType(TokenType.Semi))
+            {
+                Console.WriteLine(PeekToken().Type);
+                TryConsume();
+            }
+        }
+
+        if (CheckTokenType(TokenType.Semi))
+        {
+            ConsumeToken(); 
+        }
+
+        Console.WriteLine("consumed declaration");
+        Console.WriteLine(PeekToken().Type);
         return scopedVar;
     }
 
@@ -233,6 +251,10 @@ public class ParserSimple : IParser
         AstNodeClassMemberVar memberVar = new();
         AccessModifier? accessModifier = TokenIsAccessModifier(PeekToken());
         memberVar.AccessModifier = accessModifier ?? AccessModifier.Public;
+        if (accessModifier is not null)
+        {
+            ConsumeToken();
+        }
         memberVar.ScopeMemberVar = ParseScopeMemberVariableDeclaration([MemberModifier.Final, MemberModifier.Static]);
         return memberVar;
     }
